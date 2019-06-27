@@ -186,7 +186,7 @@ def test_generator(maps, it_test, Nframes):
 # ------------------------------------------------------------
 # Here is where to set up the parameter of the batch generator
 
-Nframes = 20  # Number of frames within each sequences to be used during training
+Nframes = 16  # Number of frames within each sequences to be used during training
 batch_size = 10  # Number of sequences to included within each batch during training
 epochs = 5
 
