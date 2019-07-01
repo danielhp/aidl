@@ -10,9 +10,9 @@ from sklearn.model_selection import train_test_split
 # LOADING DATA
 from unet_2d.model import get_unet_norm
 
-ncfile_r = MFDataset('psl_200001to200912-001.nc')
+ncfile_r = MFDataset('ShortTrain_1year/clt/*.nc')
 
-maps = ncfile_r.variables['psl']
+maps = ncfile_r.variables['clt']
 
 Nt, Ny, Nx = maps.shape
 print('{} maps ready to be loaded'.format(Nt))
@@ -254,7 +254,7 @@ for Xtrain_i, Ytrain_i in BG:
     break
 
 # Initializing the CNN
-model = get_unet_norm((256, 512, Nframes))
+model = get_unet_norm((128, 128, Nframes))
 
 # compiling the ANN
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['mean_squared_error'])
