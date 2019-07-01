@@ -4,17 +4,23 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from netCDF4 import Dataset, MFDataset
+from netCDF4 import MFDataset
 from sklearn.model_selection import train_test_split
 
-import unet_model
-
 # LOADING DATA
+from unet_2d.model import get_unet_norm
+
 ncfile_r = MFDataset('psl_200001to200912-001.nc')
+
 maps = ncfile_r.variables['psl']
 
 Nt, Ny, Nx = maps.shape
 print('{} maps ready to be loaded'.format(Nt))
+
+x0 = 0
+xn = 128
+y0 = 0
+yn = 128
 
 
 # DEFINING BATCH DATA GENERATOR
@@ -80,7 +86,7 @@ def train_split_seq(maps, Nframes, r_train=0.7, r_val=0.2, r_test=0.1, random_st
     return it_train, it_val, it_test
 
 
-def batch_generator(maps, it_train, Nframes, batch_size=32):
+def batch_generator(maps, x0, xn, y0, yn, it_train, Nframes, batch_size=32):
     # Batch data generator.
     # INPUTS:
     # - maps: netcdf object representing all maps from the set of
@@ -114,12 +120,12 @@ def batch_generator(maps, it_train, Nframes, batch_size=32):
         for it_batch in range(0, Lt_train - dit_batch, dit_batch):
             it_batch_train = it_train[np.arange(it_batch, it_batch + dit_batch)]
 
-            XYtrain = maps[it_batch_train, :, :]
+            XYtrain = maps[it_batch_train, x0:xn, y0:yn]
 
-            Xtrain_i = XYtrain[iX, :, :].reshape(batch_size, Nframes, Ny, Nx)
+            Xtrain_i = XYtrain[iX, :, :].reshape(batch_size, Nframes, xn, yn)
             Xtrain_i = np.squeeze(Xtrain_i)
 
-            Ytrain_i = XYtrain[iY, :, :].reshape(batch_size, Ny, Nx)
+            Ytrain_i = XYtrain[iY, :, :].reshape(batch_size, yn, xn)
 
             # Xtrain_i = np.expand_dims(Xtrain_i, axis = Xtrain_i.ndim)
             Ytrain_i = np.expand_dims(Ytrain_i, axis=Ytrain_i.ndim)
@@ -129,10 +135,10 @@ def batch_generator(maps, it_train, Nframes, batch_size=32):
             yield (Xtrain_i, Ytrain_i)
 
 
-def validation_generator(maps, it_val, Nframes):
+def validation_generator(maps, x0, xn, y0, yn, it_val, Nframes):
     Nframes_with_test = Nframes + 1
 
-    XYval = maps[it_val, :, :]
+    XYval = maps[it_val, x0:xn, y0:yn]
     Nt_val, Ny, Nx = XYval.shape
 
     Nseq_val = np.int(Nt_val / Nframes_with_test)
@@ -141,7 +147,7 @@ def validation_generator(maps, it_val, Nframes):
     iY = range(Nframes, Nt_val, Nframes_with_test)
     iX = ~np.in1d(iXY, iY)
 
-    Xval = XYval[iX, :, :].reshape(Nseq_val, Nframes, Ny, Nx)
+    Xval = XYval[iX, :, :].reshape(Nseq_val, Nframes, yn, xn)
     Xval = np.squeeze(Xval)
 
     Yval = XYval[iY, :, :]
@@ -155,10 +161,10 @@ def validation_generator(maps, it_val, Nframes):
     return (Xval, Yval)
 
 
-def test_generator(maps, it_test, Nframes):
+def test_generator(maps, x0, xn, y0, yn, it_test, Nframes):
     Nframes_with_test = Nframes + 1
 
-    XYtest = maps[it_test, :, :]
+    XYtest = maps[it_test, x0:xn, y0:yn]
     Nt_test, Ny, Nx = XYtest.shape
 
     Nseq_test = np.int(Nt_test / Nframes_with_test)
@@ -167,7 +173,7 @@ def test_generator(maps, it_test, Nframes):
     iY = range(Nframes, Nt_test, Nframes_with_test)
     iX = ~np.in1d(iXY, iY)
 
-    Xtest = XYtest[iX, :, :].reshape(Nseq_test, Nframes, Ny, Nx)
+    Xtest = XYtest[iX, :, :].reshape(Nseq_test, Nframes, yn, xn)
     Xtest = np.squeeze(Xtest)
 
     Ytest = XYtest[iY, :, :]
@@ -185,12 +191,12 @@ def test_generator(maps, it_test, Nframes):
 # Here is where to set up the parameter of the batch generator
 
 Nframes = 10  # Number of frames within each sequences to be used during training
-batch_size = 32  # Number of sequences to included within each batch during training
-epochs = 5
+batch_size = 15  # Number of sequences to included within each batch during training
+epochs = 40
 
-r_train = 0.8  # Proportion of all sequences to be used during training
-r_val = 0.1  # Proportion of all sequences to be used as validation set
-r_test = 0.1  # Proportion of all sequences to be used as final test set
+r_train = 0.9  # Proportion of all sequences to be used during training
+r_val = 0.05  # Proportion of all sequences to be used as validation set
+r_test = 0.05  # Proportion of all sequences to be used as final test set
 
 # Number of samples = number of sequences = number maps / number frames
 Nseq = np.floor((Nt - 1) / Nframes)
@@ -204,10 +210,10 @@ if r_train + r_val + r_test != 1:
 it_train, it_val, it_test = train_split_seq(maps, Nframes=Nframes, r_train=r_train, r_val=r_val, r_test=r_test, random_state=None)
 
 # Creating the batch generator to be used during training
-BG = batch_generator(maps, it_train, Nframes=Nframes, batch_size=batch_size)
+BG = batch_generator(maps, x0, xn, y0, yn, it_train, Nframes=Nframes, batch_size=batch_size)
 
 # Creating the validation data to be used during training
-VG = validation_generator(maps, it_val, Nframes)
+VG = validation_generator(maps, x0, xn, y0, yn, it_val, Nframes)
 
 print('{} maps in total'.format(Nt))
 print('{} / {} / {} maps for training / validation / test'.format(len(it_train), len(it_val), len(it_test)))
@@ -247,18 +253,11 @@ for Xtrain_i, Ytrain_i in BG:
 
     break
 
-# DEFINING SIMPLE MODEL BASED ON AUTOENCODER FOR TESTING THE BATCH DATA GENERATOR.
-# To be used with with one frame as input to predict next frame. Should be
-# modified to accept more than one frame as input
-
 # Initializing the CNN
-model = unet_model.get_unet((256, 512, Nframes))
+model = get_unet_norm((256, 512, Nframes))
 
 # compiling the ANN
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['mean_squared_error'])
-# model.compile(optimizer='rmsprop',loss='binary_crossentropy', metrics = ['mean_squared_error'])
-# model.compile(optimizer='adam',loss='mean_squared_error', metrics = ['mean_squared_error'])
-# model.compile(optimizer='rmsprop',loss='mean_squared_error', metrics = ['mean_squared_error'])
 
 
 model.summary()
@@ -268,6 +267,8 @@ model.summary()
 # ----------------------------------------
 
 history = model.fit_generator(BG, validation_data=VG, epochs=epochs, steps_per_epoch=spe)
+
+model.save('weights.h5')
 
 # print(history.history.keys())
 # summarize history for accuracy
@@ -290,7 +291,6 @@ plt.ylabel('mse')
 plt.xlabel('epoch')
 plt.show()
 
-model.save('weights.h5')
 
 # Creating the validation data to be used during training
 Xtest, Ytest = VG
@@ -325,46 +325,3 @@ plt.imshow(Ypred[0, :, :, 0])
 plt.subplot(224)
 plt.title('Original map time_t+1')
 plt.imshow(Yvali[:, :])
-
-# TO CHECK SOME PREDICTIONS
-i = 5
-Xval, Yval = VG
-
-Xvali = Xval[i, :, :, :].reshape(1, 256, 512, 10)
-
-num_output_frames = 5
-
-auxX = Xvali
-
-auxX[:, :, 0] = Xvali[:, :, 0]
-auxX[:, :, 1] = Xvali[:, :, 1]
-auxX[:, :, 2] = Xvali[:, :, 2]
-auxX[:, :, 3] = Xvali[:, :, 3]
-auxX[:, :, 4] = Xvali[:, :, 4]
-auxX[:, :, 5] = Xvali[:, :, 5]
-auxX[:, :, 6] = Xvali[:, :, 6]
-auxX[:, :, 7] = Xvali[:, :, 7]
-auxX[:, :, 8] = Xvali[:, :, 8]
-auxX[:, :, 9] = Xvali[:, :, 9]
-
-print(auxX.shape)
-
-for i in range(num_output_frames):
-    Ypred = model.predict(auxX)
-    print(Ypred.shape)
-    fig = plt.figure(figsize=(80, 40), facecolor='w', edgecolor='k')
-    plt.subplot(1, num_output_frames, i + 1)
-    plt.imshow(Ypred[0, :, :, 0])
-
-    auxX[:, :, 0] = auxX[:, :, 1]
-    auxX[:, :, 1] = auxX[:, :, 2]
-    auxX[:, :, 2] = auxX[:, :, 3]
-    auxX[:, :, 3] = auxX[:, :, 4]
-    auxX[:, :, 4] = auxX[:, :, 5]
-    auxX[:, :, 5] = auxX[:, :, 6]
-    auxX[:, :, 6] = auxX[:, :, 7]
-    auxX[:, :, 7] = auxX[:, :, 8]
-    auxX[:, :, 8] = auxX[:, :, 9]
-    auxX[:, :, 9] = Ypred[:, :, 0]
-
-plt.show()

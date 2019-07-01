@@ -2,14 +2,12 @@
 
 # IMPORTING MODULES
 import numpy as np
-import matplotlib.pyplot as plt
 from netCDF4 import MFDataset
 from sklearn.model_selection import train_test_split
 
-import unet_model
+from unet_3d import model
 
 dataIn = 'CloudCover6hourly2000_nc/'
-
 
 # LOADING DATA
 ncfile_r = MFDataset(dataIn + '*.nc')
@@ -22,7 +20,6 @@ print('{} maps ready to be loaded'.format(Nt))
 # DEFINING BATCH DATA GENERATOR
 #
 # NOTHING TO BE SET OR MODIFIED HERE
-
 def seq2frames(iseq, Nframes):
     # Sequence to frame index
     # Function to be used within train_split_seq to transform sequence index to
@@ -123,10 +120,11 @@ def batch_generator(maps, it_train, Nframes, batch_size=32):
 
             Ytrain_i = XYtrain[iY, :, :].reshape(batch_size, Ny, Nx)
 
-            # Xtrain_i = np.expand_dims(Xtrain_i, axis = Xtrain_i.ndim)
+            Xtrain_i = np.expand_dims(Xtrain_i, axis=Xtrain_i.ndim)
+            Ytrain_i = np.expand_dims(Ytrain_i, axis=Ytrain_i.ndim)
             Ytrain_i = np.expand_dims(Ytrain_i, axis=Ytrain_i.ndim)
 
-            Xtrain_i = np.transpose(Xtrain_i, (0, 2, 3, 1))
+            Xtrain_i = np.transpose(Xtrain_i, (0, 2, 3, 1, 4))
 
             yield (Xtrain_i, Ytrain_i)
 
@@ -148,10 +146,11 @@ def validation_generator(maps, it_val, Nframes):
 
     Yval = XYval[iY, :, :]
 
-    # Xval = np.expand_dims(Xval, axis = Xval.ndim)
+    Xval = np.expand_dims(Xval, axis=Xval.ndim)
+    Yval = np.expand_dims(Yval, axis=Yval.ndim)
     Yval = np.expand_dims(Yval, axis=Yval.ndim)
 
-    Xval = np.transpose(Xval, (0, 2, 3, 1))
+    Xval = np.transpose(Xval, (0, 2, 3, 1, 4))
     print(Xval.shape)
 
     return (Xval, Yval)
@@ -174,10 +173,11 @@ def test_generator(maps, it_test, Nframes):
 
     Ytest = XYtest[iY, :, :]
 
-    # Xtest = np.expand_dims(Xtest, axis = Xtest.ndim)
+    Xtest = np.expand_dims(Xtest, axis=Xtest.ndim)
+    Ytest = np.expand_dims(Ytest, axis=Ytest.ndim)
     Ytest = np.expand_dims(Ytest, axis=Ytest.ndim)
 
-    Xtest = np.transpose(Xtest, (0, 2, 3, 1))
+    Xtest = np.transpose(Xtest, (0, 2, 3, 1, 4))
 
     return (Xtest, Ytest)
 
@@ -190,9 +190,9 @@ Nframes = 16  # Number of frames within each sequences to be used during trainin
 batch_size = 10  # Number of sequences to included within each batch during training
 epochs = 5
 
-r_train = 0.8  # Proportion of all sequences to be used during training
-r_val = 0.1  # Proportion of all sequences to be used as validation set
-r_test = 0.1  # Proportion of all sequences to be used as final test set
+r_train = 0.9  # Proportion of all sequences to be used during training
+r_val = 0.05  # Proportion of all sequences to be used as validation set
+r_test = 0.05  # Proportion of all sequences to be used as final test set
 
 # Number of samples = number of sequences = number maps / number frames
 Nseq = np.floor((Nt - 1) / Nframes)
@@ -223,43 +223,13 @@ print('{} sequences = samples per batch'.format(batch_size))
 print('{} batches per epoch'.format(spe))
 print('{} epochs'.format(epochs))
 
-# Checking data is correct: Xtrain vs Ytrain
-for Xtrain_i, Ytrain_i in BG:
-    i = 1
-    j = 5
-
-    plt.figure(figsize=(20, 10), facecolor='w', edgecolor='k')
-    # plt.gray()
-
-    plt.subplot(2, 2, 1)
-    plt.imshow(Xtrain_i[i, :, :, 0])
-    plt.clim([0, 1])
-
-    plt.subplot(2, 2, 2)
-    plt.imshow(Ytrain_i[i, :, :, 0])
-    plt.clim([0, 1])
-
-    plt.subplot(2, 2, 3)
-    plt.imshow(Xtrain_i[j, :, :, 0])
-    plt.clim([0, 1])
-
-    plt.subplot(2, 2, 4)
-    plt.imshow(Ytrain_i[j, :, :, 0])
-    plt.clim([0., 1])
-
-    break
-
-# DEFINING SIMPLE MODEL BASED ON AUTOENCODER FOR TESTING THE BATCH DATA GENERATOR.
-# To be used with with one frame as input to predict next frame. Should be
-# modified to accept more than one frame as input
-
 # Initializing the CNN
-model = unet_model.get_unet_3d((256, 512, Nframes, 1))
+model = model.get_unet_3d_2((256, 512, Nframes, 1))
 
 # compiling the ANN
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['mean_squared_error'])
+# model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['mean_squared_error'])
 # model.compile(optimizer='rmsprop',loss='binary_crossentropy', metrics = ['mean_squared_error'])
-# model.compile(optimizer='adam',loss='mean_squared_error', metrics = ['mean_squared_error'])
+model.compile(optimizer='adam',loss='mean_squared_error', metrics = ['mean_squared_error'])
 # model.compile(optimizer='rmsprop',loss='mean_squared_error', metrics = ['mean_squared_error'])
 
 
@@ -269,4 +239,4 @@ model.summary()
 # (Nothing to set or modified here)
 # ----------------------------------------
 
-#history = model.fit_generator(BG, validation_data=VG, epochs=epochs, steps_per_epoch=spe)
+history = model.fit_generator(BG, validation_data=VG, epochs=epochs, steps_per_epoch=spe)
