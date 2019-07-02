@@ -388,11 +388,15 @@ model.compile(optimizer='adam',loss='binary_crossentropy', metrics = ['mean_squa
 
 model.summary()
 
+#Add a variance to lr in case loss becomes constant
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                              patience=2, min_lr=0.000001, verbose=1)
+
 
 # TRAIN MODEL AND SHOW RESULTS
 # (Nothing to set or modified here)
 # ----------------------------------------
-history=model.fit_generator(BG, validation_data = VG, epochs = epochs, steps_per_epoch = spe, use_multiprocessing=True)
+history=model.fit_generator(BG, validation_data = VG, epochs = epochs, steps_per_epoch = spe, callbacks=[reduce_lr], use_multiprocessing=True)
 model.save_weights('encoder_LSTM_decoder.h5')
 model.save('encoder_LSTM_decoder_model.h5')
 
