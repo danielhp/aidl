@@ -393,7 +393,8 @@ model.summary()
 # (Nothing to set or modified here)
 # ----------------------------------------
 history=model.fit_generator(BG, validation_data = VG, epochs = epochs, steps_per_epoch = spe, use_multiprocessing=True)
-model.save('encoder_LSTM_decoder_weights.h5')
+model.save_weights('encoder_LSTM_decoder.h5')
+model.save('encoder_LSTM_decoder_model.h5')
 
 #print(history.history.keys())
 # summarize history for accuracy
