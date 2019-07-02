@@ -1,27 +1,16 @@
 # IMPORTING MODULES
 
-import os
-import sys
-import time
-import numpy as np
-import matplotlib.pyplot as plt
 
-from netCDF4 import Dataset, MFDataset
+from netCDF4 import Dataset
 from sklearn.model_selection import train_test_split
 
-from keras.layers import Conv2D, Conv2DTranspose, MaxPool2D, MaxPool3D, UpSampling2D, Dropout, Flatten, Dense, AveragePooling2D
-from keras.layers import Convolution2D
-from keras.callbacks import Callback, TensorBoard, ModelCheckpoint, ReduceLROnPlateau
-import imageio
-import glob
+from keras.callbacks import ReduceLROnPlateau
 import os
 
-from keras.models import Sequential
-from keras.layers.convolutional import Conv3D
-from keras.layers.convolutional_recurrent import ConvLSTM2D
-from keras.layers.normalization import BatchNormalization
 import numpy as np
-import pylab as plt
+
+from conv_lstm.model import get_model
+
 
 # SETTING PARAMETERS
 # For loading 10 years or 1 year of files, uncomment only one of the two 'dataIn' folders
@@ -251,31 +240,8 @@ print('{} batches per epoch'.format(spe))
 print('{} epochs'.format(epochs))
 
 # Neural network
-model = Sequential()
+model = get_model(xn, yn)
 
-model.add(ConvLSTM2D(filters=8, kernel_size=(3, 3),
-                     input_shape=(None, xn, yn, 1),
-                     padding='same', return_sequences=True))
-
-model.add(BatchNormalization())
-
-model.add(ConvLSTM2D(filters=32, kernel_size=(3, 3),
-                     padding='same', return_sequences=True))
-model.add(BatchNormalization())
-
-model.add(ConvLSTM2D(filters=8, kernel_size=(3, 3),
-                     padding='same', return_sequences=True))
-model.add(BatchNormalization())
-
-model.add(ConvLSTM2D(filters=1, kernel_size=(3, 3),
-                     padding='same', return_sequences=False))
-model.add(BatchNormalization())
-
-model.add(AveragePooling2D(pool_size=(1, 1), strides=None, padding='same'))
-
-model.add(Convolution2D(1, (3, 3), padding='same', activation='relu'))
-
-model.add(AveragePooling2D(pool_size=(1, 1), strides=None, padding='same'))
 model.compile(loss='binary_crossentropy', metrics=['mean_squared_error'], optimizer='adam')
 
 model.summary()
